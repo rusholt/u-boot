@@ -1,15 +1,16 @@
-if TARGET_A1BOARD
+if TARGET_MX6_A1BOARD
+
 
 config SYS_BOARD
-	default "a1board"
+	default "mx6_a1board"
 
 config SYS_VENDOR
-	default "ARL"
+	default "freescale"
 
 config SYS_SOC
 	default "mx6"
 
 config SYS_CONFIG_NAME
-	default "a1board"
+	default "mx6_a1board"
 
 endif

@@ -46,7 +46,7 @@
 #include "../drivers/video/mxcfb.h"
 #endif
 
-#include "mx6var_v2_eeprom.h"
+/*#include mx6_a1board_v2_eeprom.h husk anførelsestegn*/
 
 int var_eeprom_v2_read_struct(struct var_eeprom_config_struct_v2_type *var_eeprom_config_struct_v2);
 int eeprom_revision __attribute__ ((section ("sram")));

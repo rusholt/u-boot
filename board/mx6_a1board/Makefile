@@ -3,4 +3,4 @@
 # SPDX-License-Identifier:	GPL-2.0+
 #
 
-obj-y  := a1board.o a1board_eeprom.o
+obj-y  := mx6_a1board.o mx6_a1board_eeprom.o
