@@ -1,29 +1,17 @@
 /*
  * Copyright (C) 2015 Freescale Semiconductor, Inc.
  *
- * Copyright (C) 2015 Variscite Ltd. All Rights Reserved.
- * Maintainer: Ron Donio <ron.d@variscite.com>
- * Configuration settings for the Variscite  i.MX6UL DART board.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Copyright (C) 2015-2017 Variscite Ltd.
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#include <asm/arch/clock.h>
-#include <asm/arch/iomux.h>
-#include <asm/arch/imx-regs.h>
-#include <asm/arch/crm_regs.h>
-#include <asm/arch/mx6-pins.h>
-#include <asm/arch/sys_proto.h>
+#include <asm/arch-mx6/clock.h>
+#include <asm/arch-mx6/iomux.h>
+#include <asm/arch-mx6/imx-regs.h>
+#include <asm/arch-mx6/crm_regs.h>
+#include <asm/arch-mx6/mx6-pins.h>
+#include <asm/arch-mx6/sys_proto.h>
 #include <asm/gpio.h>
 #include <asm/imx-common/iomux-v3.h>
 #include <asm/imx-common/boot_mode.h>
@@ -38,19 +26,14 @@
 #include <netdev.h>
 #include <splash.h>
 #include <usb.h>
-#include <usb/ehci-fsl.h>
+#include <usb/ehci-ci.h>
 
 #ifdef CONFIG_VIDEO_MXS
-#include <linux/fb.h>
-#include <mxsfb.h>
+#include <asm/imx-common/video.h>
 #include "../drivers/video/mxcfb.h"
 #endif
 
-/*#include mx6_a1board_v2_eeprom.h husk anførelsestegn*/
-
-int var_eeprom_v2_read_struct(struct var_eeprom_config_struct_v2_type *var_eeprom_config_struct_v2);
-int eeprom_revision __attribute__ ((section ("sram")));
-static long sdram_size __attribute__ ((section ("sram")));
+#include "mx6_rsp_eeprom.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -89,50 +72,6 @@ DECLARE_GLOBAL_DATA_PTR;
 			PAD_CTL_SRE_FAST)
 #define GPMI_PAD_CTRL2 (GPMI_PAD_CTRL0 | GPMI_PAD_CTRL1)
 
-/*
- * OCOTP_CFG3[17:16] (see Fusemap Description Table offset 0x440)
- * defines a 2-bit SPEED_GRADING
- */
-#define OCOTP_CFG3_SPEED_SHIFT	16
-
-/* For i.MX6UL/i.MX6ULL */
-#define OCOTP_CFG3_SPEED_528MHZ	1
-
-/* For i.MX6UL */
-#define OCOTP_CFG3_SPEED_696MHZ	2
-
-/* For i.MX6ULL */
-#define OCOTP_CFG3_SPEED_792MHZ	2
-#define OCOTP_CFG3_SPEED_900MHZ	3
-
-u32 get_cpu_speed_grade_hz(void)
-{
-	struct ocotp_regs *ocotp = (struct ocotp_regs *)OCOTP_BASE_ADDR;
-	struct fuse_bank *bank = &ocotp->bank[0];
-	struct fuse_bank0_regs *fuse =
-		(struct fuse_bank0_regs *)bank->fuse_regs;
-	uint32_t val;
-
-	val = readl(&fuse->cfg3);
-	val >>= OCOTP_CFG3_SPEED_SHIFT;
-	val &= 0x3;
-
-	if (val == OCOTP_CFG3_SPEED_528MHZ)
-		return 528000000;
-
-	if (is_mx6ul()) {
-		if (val == OCOTP_CFG3_SPEED_696MHZ)
-			return 696000000;
-	} else if (is_mx6ull()) {
-		if (val == OCOTP_CFG3_SPEED_792MHZ)
-			return 792000000;
-		else if (val == OCOTP_CFG3_SPEED_900MHZ)
-			return 900000000;
-	}
-
-	return 0;
-}
-
 #ifdef CONFIG_SYS_I2C_MXC
 #define PC MUX_PAD_CTRL(I2C_PAD_CTRL)
 /* I2C1  38 54 55*/
@@ -165,31 +104,16 @@ static struct i2c_pads_info i2c_pad_info2 = {
 		.gp = IMX_GPIO_NR(1, 31),
 	},
 };
-
-#ifdef CONFIG_POWER
-#define I2C_PMIC	0
-int power_init_board(void)
-{
-	return 0;
-}
-
-#ifdef CONFIG_LDO_BYPASS_CHECK
-void ldo_mode_set(int ldo_bypass)
-{
-	return;
-}
-#endif
-#endif
 #endif
 
 int dram_init(void)
 {
 	unsigned int volatile * const port1 = (unsigned int *) PHYS_SDRAM;
 	unsigned int volatile * port2;
-	unsigned int volatile * ddr_cs0_end = (unsigned int*) DDR0_CS0_END;
+	unsigned int volatile * ddr_cs0_end = (unsigned int *) DDR0_CS0_END;
 
 	/* Set the sdram_size to the actually configured one */
-	sdram_size = ((*ddr_cs0_end) - 63) * 32;
+	unsigned int sdram_size = ((*ddr_cs0_end) - 63) * 32;
 	do {
 		port2 = (unsigned int volatile *) (PHYS_SDRAM + ((sdram_size * 1024 * 1024) / 2));
 
@@ -203,7 +127,7 @@ int dram_init(void)
 
 	} while (sdram_size > 128);
 
-	gd->ram_size = ((ulong)sdram_size * 1024 * 1024);
+	gd->ram_size = (sdram_size * 1024 * 1024);
 
 	return 0;
 }
@@ -222,7 +146,7 @@ static iomux_v3_cfg_t const usdhc1_pads[] = {
 	MX6_PAD_SD1_DATA3__USDHC1_DATA3 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 };
 
-#ifndef CONFIG_SYS_USE_NAND
+#ifndef CONFIG_NAND_MXS
 static iomux_v3_cfg_t const usdhc2_pads[] = {
 	MX6_PAD_NAND_RE_B__USDHC2_CLK | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_NAND_WE_B__USDHC2_CMD | MUX_PAD_CTRL(USDHC_PAD_CTRL),
@@ -304,22 +228,9 @@ static void setup_iomux_uart(void)
 
 static struct fsl_esdhc_cfg usdhc_cfg[2];
 
-int mmc_get_env_devno(void)
+int board_mmc_get_env_dev(int devno)
 {
-	u32 soc_sbmr = readl(SRC_BASE_ADDR + 0x4);
-	int dev_no;
-	u32 bootsel;
-
-	bootsel = (soc_sbmr & 0x000000FF) >> 6;
-
-	/* If not boot from sd/mmc, use default value */
-	if (bootsel != 1)
-		return CONFIG_SYS_MMC_ENV_DEV;
-
-	/* BOOT_CFG2[3] and BOOT_CFG2[4] */
-	dev_no = (soc_sbmr & 0x00001800) >> 11;
-
-	return dev_no;
+	return devno;
 }
 
 static int check_env(char *var, char *val)
@@ -369,7 +280,7 @@ int board_mmc_init(bd_t *bis)
 			usdhc_cfg[0].sdhc_clk = mxc_get_clock(MXC_ESDHC_CLK);
 			usdhc_cfg[0].max_bus_width = 4;
 			break;
-#if !defined(CONFIG_SYS_USE_NAND)
+#ifndef CONFIG_NAND_MXS
 		case 1:
 			imx_iomux_v3_setup_multiple_pads(
 					usdhc2_pads, ARRAY_SIZE(usdhc2_pads));
@@ -389,17 +300,20 @@ int board_mmc_init(bd_t *bis)
 	}
 	return 0;
 #else
-	int devno = mmc_get_env_devno();
+	int devno = mmc_get_env_dev();
+	puts("MMC Boot Device: ");
 	switch (devno) {
 	case 0:
+		puts("mmc0 (SD)\n");
 		imx_iomux_v3_setup_multiple_pads(
 				usdhc1_pads, ARRAY_SIZE(usdhc1_pads));
 		usdhc_cfg[0].esdhc_base = USDHC1_BASE_ADDR;
 		usdhc_cfg[0].sdhc_clk = mxc_get_clock(MXC_ESDHC_CLK);
 		usdhc_cfg[0].max_bus_width = 4;
 		break;
-#if !defined(CONFIG_SYS_USE_NAND)
+#ifndef CONFIG_NAND_MXS
 	case 1:
+		puts("mmc1 (eMMC)\n");
 		imx_iomux_v3_setup_multiple_pads(
 				usdhc2_pads, ARRAY_SIZE(usdhc2_pads));
 		usdhc_cfg[0].esdhc_base = USDHC2_BASE_ADDR;
@@ -419,7 +333,7 @@ int board_mmc_init(bd_t *bis)
 void board_late_mmc_init(void)
 {
 	char cmd[32];
-	u32 dev_no = mmc_get_env_devno();
+	u32 dev_no = mmc_get_env_dev();
 
 	if (!check_env("mmcautodetect", "yes"))
 		return;
@@ -462,32 +376,28 @@ static iomux_v3_cfg_t const pwm_pads[] = {
 	MX6_PAD_LCD_DATA00__GPIO3_IO05 | MUX_PAD_CTRL(NO_PAD_CTRL),
 };
 
-struct lcd_panel_info_t {
-	unsigned int lcdif_base_addr;
-	int depth;
-	void (*enable)(struct lcd_panel_info_t const *dev);
-	struct fb_videomode mode;
-};
-
-void do_enable_parallel_lcd(struct lcd_panel_info_t const *dev)
+void do_enable_parallel_lcd(struct display_info_t const *dev)
 {
-	enable_lcdif_clock(dev->lcdif_base_addr);
+	enable_lcdif_clock(dev->bus, 1);
 
 	imx_iomux_v3_setup_multiple_pads(lcd_pads, ARRAY_SIZE(lcd_pads));
 
 	imx_iomux_v3_setup_multiple_pads(pwm_pads, ARRAY_SIZE(pwm_pads));
 
 	/* Set Brightness to high */
+	gpio_request(IMX_GPIO_NR(3, 5), "backlight");
 	gpio_direction_output(IMX_GPIO_NR(3, 5) , 1);
 }
 
 #define MHZ2PS(f)       (1000000/(f))
 
-static struct lcd_panel_info_t const displays[] = {{
-	.lcdif_base_addr = LCDIF1_BASE_ADDR,
-	.depth = 24,
+struct display_info_t const displays[] = {{
+	.bus = MX6UL_LCDIF1_BASE_ADDR,
+	.addr = 0,
+	.pixfmt = 24,
+	.detect = NULL,
 	.enable	= do_enable_parallel_lcd,
-	.mode = {
+	.mode	= {
 		.name           = "VAR-WVGA-LCD",
 		.xres           = 800,
 		.yres           = 480,
@@ -500,44 +410,8 @@ static struct lcd_panel_info_t const displays[] = {{
 		.vsync_len      = 3,
 		.sync           = FB_SYNC_CLK_LAT_FALL,
 		.vmode          = FB_VMODE_NONINTERLACED
-	}
-}};
-
-int board_video_skip(void)
-{
-	int i;
-	int ret;
-	char const *panel = getenv("panel");
-	if (!panel) {
-		panel = displays[0].mode.name;
-		printf("No panel detected: default to %s\n", panel);
-		i = 0;
-	} else {
-		for (i = 0; i < ARRAY_SIZE(displays); i++) {
-			if (!strcmp(panel, displays[i].mode.name))
-				break;
-		}
-	}
-	if (i < ARRAY_SIZE(displays)) {
-		ret = mxs_lcd_panel_setup(displays[i].mode, displays[i].depth,
-				    displays[i].lcdif_base_addr);
-		if (!ret) {
-			if (displays[i].enable)
-				displays[i].enable(displays+i);
-			printf("Display: %s (%ux%u)\n",
-			       displays[i].mode.name,
-			       displays[i].mode.xres,
-			       displays[i].mode.yres);
-		} else
-			printf("LCD %s cannot be configured: %d\n",
-			       displays[i].mode.name, ret);
-	} else {
-		printf("unsupported panel %s\n", panel);
-		return -EINVAL;
-	}
-
-	return 0;
-}
+} } };
+size_t display_count = ARRAY_SIZE(displays);
 #endif /* CONFIG_VIDEO_MXS */
 
 #ifdef CONFIG_SPLASH_SCREEN
@@ -546,100 +420,63 @@ static void set_splashsource_to_boot_rootfs(void)
 	if (!check_env("splashsourceauto", "yes"))
 		return;
 
-#ifdef CONFIG_SYS_BOOT_NAND
+#ifdef CONFIG_NAND_BOOT
 	setenv("splashsource", "nand");
 #else
-	if (mmc_get_env_devno() == 0)
+	if (mmc_get_env_dev() == 0)
 		setenv("splashsource", "sd");
-	else if (mmc_get_env_devno() == 1)
+	else if (mmc_get_env_dev() == 1)
 		setenv("splashsource", "emmc");
 #endif
 }
-
-#ifdef CONFIG_SYS_BOOT_NAND
-int splash_load_from_ubifs(void)
-{
-	char *mtdpart = "rootfs";
-	char *ubivolume = "ubi0:rootfs";
-	char *splash_file;
-	char *env_splashimage_value;
-	char cmd[64];
-	int ret;
-
-	env_splashimage_value = getenv("splashimage");
-	if (env_splashimage_value == NULL) {
-		return -ENOENT;
-	}
-
-	splash_file = getenv("splashfile");
-	if (!splash_file)
-		splash_file = "splash.bmp";
-
-	sprintf(cmd, "ubi part %s", mtdpart);
-	ret = run_command(cmd, 0);
-	if (ret)
-		return ret;
-
-	sprintf(cmd, "ubifsmount %s", ubivolume);
-	ret = run_command(cmd, 0);
-	if (ret)
-		return ret;
-
-	sprintf(cmd, "ubifsload %s %s", env_splashimage_value, splash_file);
-	ret = run_command(cmd, 0);
-	if (ret)
-		printf("Error loading splash file %s\n", splash_file);
-
-	run_command("ubifsumount", 0);
-
-	return ret;
-}
-#endif
 
 int splash_screen_prepare(void)
 {
 	int ret=0;
 
+	char sd_devpart_str[5];
+	char emmc_devpart_str[5];
+	u32 sd_part, emmc_part;
+
+	sd_part = emmc_part = getenv_ulong("mmcrootpart", 10, 0);
+
+	sprintf(sd_devpart_str, "0:%d", sd_part);
+	sprintf(emmc_devpart_str, "1:%d", emmc_part);
+
+	struct splash_location var_splash_locations[] = {
+		{
+			.name = "sd",
+			.storage = SPLASH_STORAGE_MMC,
+			.flags = SPLASH_STORAGE_FS,
+			.devpart = sd_devpart_str,
+		},
+		{
+			.name = "emmc",
+			.storage = SPLASH_STORAGE_MMC,
+			.flags = SPLASH_STORAGE_FS,
+			.devpart = emmc_devpart_str,
+		},
+		{
+			.name = "nand",
+			.storage = SPLASH_STORAGE_NAND,
+			.flags = SPLASH_STORAGE_FS,
+			.mtdpart = "rootfs",
+			.ubivol = "ubi0:rootfs",
+		},
+	};
+
 	set_splashsource_to_boot_rootfs();
 
-	if (check_env("splashsource", "nand")) {
-#ifdef CONFIG_SYS_BOOT_NAND
-		ret = splash_load_from_ubifs();
-#endif
-	} else {
-		char sd_devpart_str[5];
-		char emmc_devpart_str[5];
-		u32 sd_part, emmc_part;
-
-		sd_part = emmc_part = getenv_ulong("mmcrootpart", 10, 0);
-
-		sprintf(sd_devpart_str, "0:%d", sd_part);
-		sprintf(emmc_devpart_str, "1:%d", emmc_part);
-
-		struct splash_location var_splash_locations[] = {
-			{
-				.name = "sd",
-				.storage = SPLASH_STORAGE_MMC,
-				.flags = SPLASH_STORAGE_FS,
-				.devpart = sd_devpart_str,
-			},
-			{
-				.name = "emmc",
-				.storage = SPLASH_STORAGE_MMC,
-				.flags = SPLASH_STORAGE_FS,
-				.devpart = emmc_devpart_str,
-			},
-		};
-
-		ret = splash_source_load(var_splash_locations,
-				ARRAY_SIZE(var_splash_locations));
-	}
+	ret = splash_source_load(var_splash_locations,
+			ARRAY_SIZE(var_splash_locations));
 
 	return ret;
 }
 #endif /* CONFIG_SPLASH_SCREEN */
 
 #ifdef CONFIG_USB_EHCI_MX6
+#ifndef CONFIG_DM_USB
+
 #define USB_OTHERREGS_OFFSET	0x800
 #define UCTRL_PWR_POL		(1 << 9)
 
@@ -656,10 +493,14 @@ static void setup_usb(void)
 
 int board_usb_phy_mode(int port)
 {
-	if (port == 1)
+	if (port == 1) {
 		return USB_INIT_HOST;
-	else
-		return USB_INIT_DEVICE;
+	} else {
+		if (check_env("usbmode", "host"))
+			return USB_INIT_HOST;
+		else
+			return USB_INIT_DEVICE;
+	}
 }
 
 int board_ehci_hcd_init(int port)
@@ -677,6 +518,7 @@ int board_ehci_hcd_init(int port)
 
 	return 0;
 }
+#endif
 #endif
 
 #ifdef CONFIG_FEC_MXC
@@ -778,10 +620,19 @@ int board_phy_config(struct phy_device *phydev)
 }
 #endif
 
+static void setup_local_i2c(void)
+{
+	setup_i2c(0, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info1);
+	setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info2);
+}
+
 int board_early_init_f(void)
 {
 	setup_iomux_uart();
 
+#ifdef CONFIG_SYS_I2C_MXC
+	setup_local_i2c();
+#endif
 	return 0;
 }
 
@@ -790,20 +641,17 @@ int board_init(void)
 	/* Address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM + 0x100;
 
-#ifdef CONFIG_SYS_I2C_MXC
-	setup_i2c(0, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info1);
-	setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info2);
-#endif
-
 #ifdef	CONFIG_FEC_MXC
 	setup_fec(CONFIG_FEC_ENET_DEV);
 #endif
 
 #ifdef CONFIG_USB_EHCI_MX6
+#ifndef CONFIG_DM_USB
 	setup_usb();
 #endif
+#endif
 
-#ifdef CONFIG_SYS_USE_NAND
+#ifdef CONFIG_NAND_MXS
 	setup_gpmi_nand();
 #endif
 
@@ -819,15 +667,19 @@ static const struct boot_mode board_boot_modes[] = {
 };
 #endif
 
-static 	struct var_eeprom_config_struct_v2_type var_eeprom_config_struct_v2;
 #define SDRAM_SIZE_STR_LEN 5
 int board_late_init(void)
 {
 	char sdram_size_str[SDRAM_SIZE_STR_LEN];
+	struct var_eeprom_config_struct_v2_type var_eeprom_config_struct_v2 = {0};
 	u32 imxtype, cpurev;
 
 #ifdef CONFIG_CMD_BMODE
 	add_board_boot_modes(board_boot_modes);
+#endif
+
+#ifdef CONFIG_ENV_IS_IN_MMC
+	board_late_mmc_init();
 #endif
 
 #ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
@@ -837,11 +689,11 @@ int board_late_init(void)
 	imxtype = (cpurev & 0xFF000) >> 12;
 
 	if (imxtype == MXC_CPU_MX6ULL)
-		setenv("soc_type", "MX6ULL");
+		setenv("soc_type", "imx6ull");
 	else
-		setenv("soc_type", "MX6UL");
+		setenv("soc_type", "imx6ul");
 
-	snprintf(sdram_size_str, SDRAM_SIZE_STR_LEN, "%d", (int) sdram_size);
+	snprintf(sdram_size_str, SDRAM_SIZE_STR_LEN, "%d", (int) (gd->ram_size / 1024 / 1024));
 	setenv("sdram_size", sdram_size_str);
 
 	switch (get_boot_device()) {
@@ -896,18 +748,12 @@ int board_late_init(void)
 	}
 #endif
 
-#ifdef CONFIG_ENV_IS_IN_MMC
-	board_late_mmc_init();
-#endif
-
 	return 0;
 }
 
 int checkboard(void)
 {
-	printf("Board: Variscite DART %s %d MHz\n",
-		is_mx6ul() ? "MX6UL" : "MX6ULL",
-		get_cpu_speed_grade_hz() / 1000000);
+	puts("Board: Variscite DART-6UL\n");
 
 	return 0;
 }
@@ -916,7 +762,6 @@ int checkboard(void)
 #include <libfdt.h>
 #include <spl.h>
 #include <asm/arch/mx6-ddr.h>
-
 
 static struct mx6ul_iomux_grp_regs mx6_grp_ioregs = {
 	.grp_addds = 0x00000030,
@@ -990,83 +835,69 @@ static void ccgr_init(void)
 	writel(0xFFFFFFFF, &ccm->CCGR5);
 	writel(0xFFFFFFFF, &ccm->CCGR6);
 	writel(0xFFFFFFFF, &ccm->CCGR7);
-/* Enable Audio Clock for SOM codec */
+	/* Enable Audio Clock for SOM codec */
 	writel(0x01130100, (long *)CCM_CCOSR);
 }
 
-void p_udelay(int time)
-{
-	int i, j;
-
-	for (i = 0; i < time; i++) {
-		for (j = 0; j < 200; j++) {
-			asm("nop");
-			asm("nop");
-		}
-	}
-}
-
-int var_get_boot_device(void)
-{
-	switch (spl_boot_device()) {
-	case BOOT_DEVICE_MMC1:
-		if (mmc_get_env_devno() == 1)
-			return BOOT_DEVICE_MMC2;
-		else
-			return BOOT_DEVICE_MMC1;
-	case BOOT_DEVICE_NAND:
-		return BOOT_DEVICE_NAND;
-	default:
-		return BOOT_DEVICE_NONE;
-	}
-}
-
-static void spl_dram_init(void)
+static void legacy_dram_init(void)
 {
 	mx6ul_dram_iocfg(mem_ddr.width, &mx6_ddr_ioregs, &mx6_grp_ioregs);
 	mx6_dram_cfg(&ddr_sysinfo, &mx6_mmcd_calib, &mem_ddr);
 }
 
 /*
- * Second phase ddr init. Use eeprom values.
+ * Null terminate the info strings, in case the info was never written to EEPROM and it contains garbage
  */
-static struct var_eeprom_config_struct_v2_type var_eeprom_config_struct_v2;
-
-static int spl_dram_init_v2(void)
+static void var_eeprom_v2_null_term_strings(struct var_eeprom_config_struct_v2_type *p_var_eeprom_config_struct_v2)
 {
-	struct var_eeprom_config_struct_v2_type var_eeprom_config_struct_v2;
-	int ret;
+	p_var_eeprom_config_struct_v2->part_number[sizeof(p_var_eeprom_config_struct_v2->part_number) - 1] = (u8)0;
+	p_var_eeprom_config_struct_v2->Assembly[sizeof(p_var_eeprom_config_struct_v2->Assembly) - 1] = (u8)0;
+	p_var_eeprom_config_struct_v2->date[sizeof(p_var_eeprom_config_struct_v2->date) - 1] = (u8)0;
+}
 
-	/* Add here: Read EEPROM and parse Variscite struct */
-	memset(&var_eeprom_config_struct_v2, 0x00, sizeof(var_eeprom_config_struct_v2));
+static void print_info_from_eeprom(const struct var_eeprom_config_struct_v2_type *p_var_eeprom_config_struct_v2)
+{
+	printf("\nPart number: %s\n", (char *)p_var_eeprom_config_struct_v2->part_number);
+	printf("Assembly: %s\n", (char *)p_var_eeprom_config_struct_v2->Assembly);
+	printf("Date of production: %s\n", (char *)p_var_eeprom_config_struct_v2->date);
 
-	ret = var_eeprom_v2_read_struct(&var_eeprom_config_struct_v2);
+	puts("DART-6UL");
+	if (((p_var_eeprom_config_struct_v2->som_info >> 3) & 0x3) == 1)
+		puts("-5G");
+	puts(" configuration: ");
+	switch(p_var_eeprom_config_struct_v2->som_info & 0x3) {
+	case 0x00:
+		puts("SD card Only ");
+		break;
+	case 0x01:
+		puts("NAND ");
+		break;
+	case 0x02:
+		puts("eMMC ");
+		break;
+	case 0x03:
+		puts("Ilegal !!! ");
+		break;
+	}
+	if (p_var_eeprom_config_struct_v2->som_info & 0x04)
+		puts("WiFi");
+	puts("\n");
+}
 
-	if (ret)
-		return SPL_DRAM_INIT_STATUS_ERROR_NO_EEPROM;
+void spl_dram_init(void)
+{
+	struct var_eeprom_config_struct_v2_type var_eeprom_config_struct_v2 = {0};
 
-	if (var_eeprom_config_struct_v2.variscite_magic != 0x32524156) /* Test for VAR2 in the header. */
-		return SPL_DRAM_INIT_STATUS_ERROR_NO_EEPROM_STRUCT_DETECTED;
+	if (var_eeprom_v2_read_struct(&var_eeprom_config_struct_v2)) {
+		legacy_dram_init();
+		puts("DDR LEGACY configuration\n");
+		return;
+	}
 
 	handle_eeprom_data(&var_eeprom_config_struct_v2);
 
-	sdram_size = var_eeprom_config_struct_v2.ddr_size*128;
-
-	return SPL_DRAM_INIT_STATUS_OK;
-}
-
-void board_dram_init(void)
-{
-	int spl_status;
-
-	/* Initialize DDR based on eeprom if exist */
-	spl_status = spl_dram_init_v2();
-	if (spl_status != SPL_DRAM_INIT_STATUS_OK) {
-		spl_dram_init();
-		eeprom_revision = 0;
-	} else {
-		eeprom_revision = 2;
-	}
+	var_eeprom_v2_null_term_strings(&var_eeprom_config_struct_v2);
+	print_info_from_eeprom(&var_eeprom_config_struct_v2);
 }
 
 void board_init_f(ulong dummy)
@@ -1076,15 +907,11 @@ void board_init_f(ulong dummy)
 
 	ccgr_init();
 
-	/* iomux and setup of i2c */
-	board_early_init_f();
-
 	/* setup GP timer */
 	timer_init();
 
-	setup_i2c(0, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info1);
-	setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info2);
-	i2c_set_bus_num(1);
+	/* iomux and setup of i2c */
+	board_early_init_f();
 
 	mdelay(200);
 
@@ -1092,65 +919,10 @@ void board_init_f(ulong dummy)
 	preloader_console_init();
 
 	/* DDR initialization */
-	board_dram_init();
+	spl_dram_init();
 
 	/* Clear the BSS. */
 	memset(__bss_start, 0, __bss_end - __bss_start);
-
-	if (eeprom_revision == 2) {
-		var_eeprom_v2_read_struct(&var_eeprom_config_struct_v2);
-
-		var_eeprom_config_struct_v2.part_number[sizeof(var_eeprom_config_struct_v2.part_number) - 1] = (u8)0x00;
-		var_eeprom_config_struct_v2.Assembly[sizeof(var_eeprom_config_struct_v2.Assembly) - 1] = (u8)0x00;
-		var_eeprom_config_struct_v2.date[sizeof(var_eeprom_config_struct_v2.date) - 1] = (u8)0x00;
-
-		printf("\nPart number: %s\n", (char *)var_eeprom_config_struct_v2.part_number);
-		printf("Assembly: %s\n", (char *)var_eeprom_config_struct_v2.Assembly);
-		printf("Date of production: %s\n", (char *)var_eeprom_config_struct_v2.date);
-
-		puts("DART-6UL");
-		if (((var_eeprom_config_struct_v2.som_info >> 3) & 0x3) == 1)
-			puts("-5G");
-		puts(" configuration: ");
-		switch (var_eeprom_config_struct_v2.som_info & 0x3) {
-		case 0x00:
-			puts("SD card Only ");
-			break;
-		case 0x01:
-			puts("NAND ");
-			break;
-		case 0x02:
-			puts("eMMC ");
-			break;
-		case 0x03:
-			puts("Ilegal !!! ");
-			break;
-		}
-		if (var_eeprom_config_struct_v2.som_info & 0x04)
-			puts("WiFi");
-		puts("\n");
-	} else {
-		puts("DDR LEGACY configuration\n");
-	}
-
-	dram_init();
-
-	puts("Boot Device: ");
-	switch (var_get_boot_device()) {
-	case BOOT_DEVICE_MMC1:
-		puts("SD");
-		break;
-	case BOOT_DEVICE_MMC2:
-		puts("eMMC");
-		break;
-	case BOOT_DEVICE_NAND:
-		puts("NAND");
-		break;
-	default:
-		puts("UNKNOWN");
-		break;
-	}
-	puts("\n");
 
 	/* load/boot image from boot device */
 	board_init_r(NULL, 0);

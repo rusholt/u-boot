@@ -551,9 +551,9 @@ config TARGET_BCMNS2
 	  ARMv8 Cortex-A57 processors targeting a broad range of networking
 	  applications
 
-config TARGET_MX6_A1BOARD
-	bool "Support mx6_a1board"
-	select CPU_V7 
+config TARGET_MX6_RSP
+	bool "Support mx6_rsp"
+	select ARCH_MX6 
 
 config ARCH_EXYNOS
 	bool "Samsung EXYNOS"
@@ -1296,7 +1296,7 @@ source "board/vscom/baltos/Kconfig"
 source "board/woodburn/Kconfig"
 source "board/work-microwave/work_92105/Kconfig"
 source "board/zipitz2/Kconfig"
-source "board/mx6_a1board/Kconfig"
+source "board/rsp-systems/mx6_rsp/Kconfig"
 
 
 source "arch/arm/Kconfig.debug"

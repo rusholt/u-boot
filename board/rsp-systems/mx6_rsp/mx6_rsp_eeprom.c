@@ -1,17 +1,7 @@
 /*
- * Copyright (C) 2015 Variscite Ltd. All Rights Reserved.
- * Maintainer: Ron Donio <ron.d@variscite.com>
- * Configuration settings for the Variscite VAR_SOM_MX6 and DART6UL board.
+ * Copyright (C) 2015 Variscite Ltd.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * SPDX-License-Identifier: GPL-2.0+
  */
 #include <common.h>
 #include <i2c.h>
@@ -77,13 +67,6 @@ void load_custom_data(u32 *custom_addresses_values)
 	}
 }
 
-int handle_eeprom_data(struct var_eeprom_config_struct_v2_type *var_eeprom_config_struct_v2)
-{
-	load_custom_data(var_eeprom_config_struct_v2->custom_addresses_values);
-
-	return setup_ddr_parameters(var_eeprom_config_struct_v2->eeprom_commands);
-}
-
 int setup_ddr_parameters(struct eeprom_command_type *eeprom_commands)
 {
 	int i=0;
@@ -99,6 +82,12 @@ int setup_ddr_parameters(struct eeprom_command_type *eeprom_commands)
 	return 0;
 }
 
+int handle_eeprom_data(struct var_eeprom_config_struct_v2_type *var_eeprom_config_struct_v2)
+{
+	load_custom_data(var_eeprom_config_struct_v2->custom_addresses_values);
+
+	return setup_ddr_parameters(var_eeprom_config_struct_v2->eeprom_commands);
+}
 
 static int handle_one_command(struct eeprom_command_type *eeprom_commands,int command_num)
 {
@@ -157,7 +146,7 @@ static int handle_one_command(struct eeprom_command_type *eeprom_commands,int co
 		case DELAY_10USEC_INDEX:
 			/* Delay for Value * 10 uSeconds */
 			/* printf("Delaying for %d microseconds\n",eeprom_commands[command_num].value_index*10); */
-			p_udelay((int)(eeprom_commands[command_num].value_index*10));
+			udelay((int)(eeprom_commands[command_num].value_index*10));
 			command_num++;
 			break;
 		case LAST_COMMAND_INDEX:
@@ -192,29 +181,33 @@ static u32 get_value_by_index(unsigned char index)
 	return rom_values[index];
 }
 
+static inline bool var_eeprom_v2_is_valid(const struct var_eeprom_config_struct_v2_type *var_eeprom_config_struct_v2)
+{
+	return (VARISCITE_MAGIC_V2 == var_eeprom_config_struct_v2->variscite_magic);
+}
+
 int var_eeprom_v2_read_struct(struct var_eeprom_config_struct_v2_type *var_eeprom_config_struct_v2)
 {
-	int eeprom_found;
-	int ret = 0;
-	int oldbus;
-
-	oldbus = i2c_get_bus_num();
 	i2c_set_bus_num(1);
 
-	eeprom_found = i2c_probe(VARISCITE_MX6_EEPROM_CHIP);
-	if (0 == eeprom_found)
-	{
-		if (i2c_read(VARISCITE_MX6_EEPROM_CHIP, 0, 1, (void*)var_eeprom_config_struct_v2,sizeof(struct var_eeprom_config_struct_v2_type)))
-		{
-			printf("Read device ID error!\n");
-			return -1;
-		}
-	}
-	else
+	if (i2c_probe(VARISCITE_MX6_EEPROM_CHIP)) {
 		printf("Error! Couldn't find EEPROM device\n");
+		return -1;
+	}
 
-	i2c_set_bus_num(oldbus);
-	return ret;
+	if (i2c_read(VARISCITE_MX6_EEPROM_CHIP, 0, 1,
+				(u8 *) var_eeprom_config_struct_v2,
+				sizeof(struct var_eeprom_config_struct_v2_type))) {
+		printf("Error reading data from EEPROM\n");
+		return -1;
+	}
+
+	if (!var_eeprom_v2_is_valid(var_eeprom_config_struct_v2)) {
+		printf("Error: Data on EEPROM is invalid\n");
+		return -1;
+	}
+
+	return 0;
 }
 
 int var_eeprom_write(uchar *ptr, u32 size, u32 offset)
@@ -225,9 +218,7 @@ int var_eeprom_write(uchar *ptr, u32 size, u32 offset)
 	u32 P0_select_page_EEPROM;
 	u32 chip;
 	u32 addr;
-	int oldbus;
 
-	oldbus = i2c_get_bus_num();
 	i2c_set_bus_num(1);
 
 	/* Write to EEPROM device */
@@ -248,7 +239,6 @@ int var_eeprom_write(uchar *ptr, u32 size, u32 offset)
 		ptr += VARISCITE_MX6_EEPROM_WRITE_MAX_SIZE;
 	}
 
-	i2c_set_bus_num(oldbus);
 	return ret;
 }
 

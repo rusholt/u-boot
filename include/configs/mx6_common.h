@@ -21,7 +21,7 @@
 #define CONFIG_SYS_BOOTM_LEN	0x1000000
 
 #include <linux/sizes.h>
-#include <asm/arch/imx-regs.h>
+#include <asm/arch-mx6/imx-regs.h>
 #include <asm/mach-imx/gpio.h>
 
 #ifndef CONFIG_MX6
